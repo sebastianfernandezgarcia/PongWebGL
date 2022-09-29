@@ -1,0 +1,442 @@
+<!doctype html>
+<html>
+  
+  <!-- CÓDIGO REALIZADO POR:
+          
+          - Sebastián Fernández García
+          - Santiago Adrián Yánez Martín
+    
+  -->
+  
+   <!-- STEP 1: Prepare the canvas -->
+   <head>
+      <style>
+         #my_Canvas{
+           border: 10px solid black;
+        }
+        h1 { color: #ffffff; font-family: 'Raleway',sans-serif; font-size: 30px; font-weight: 800; line-height: 22px; margin: 0 0 24px; text-align: center; text-transform: uppercase; }
+        h2 {color: #ffffff; font-family: 'Raleway',sans-serif; font-size: 12px; font-weight: 800; line-height: 16px; margin: 0 0 24px; text-align: center;}
+        h3 { color: #0FFF0; font-family: 'Raleway',sans-serif; font-size: 12px; font-weight: 800; line-height: 22px; margin: 0 0 24px; text-align: center; text-transform: uppercase; }
+        p { color: #f8f8f8; font-family: 'Raleway',sans-serif; font-size: 18px; font-weight: 500; line-height: 32px; margin: 0 0 24px; }
+     </style>
+   </head>
+  
+   <body style="background-color: #23AAE1">
+      <h1>
+       Bienvenido al SS-Pong<br>
+     </h1>
+     
+     <h2> 
+      Velocidades de juego:1,2,3<br>
+      Player 1: W S<br>
+      Player 2: Flechas <br>
+      Sorpresa: Pulsa C<br>
+      Pelota troll (solo distracción): flecha derecha (aparece), flecha izquierda (desaparece)<br>
+      Marcador en la parte inferior
+     </h2>
+     
+     <h3>
+       Sebastián Fernández García<br>
+       Santiago Adrián Yánez Martín
+     </h3>
+     
+      <canvas width = "450" height = "350" id = "my_Canvas"></canvas>  
+     <div id="marcador2" style="color: #ffffff; font-family: 'Raleway',sans-serif; font-size: 10px; font-weight: 800; line-height: 36px; margin: 0 0 24px; text-align: center;">
+      Arranca el partido en el Benito Villamarin. <br>
+     </div>
+     <div id="marcador" style="color: #ffffff; font-family: 'Raleway',sans-serif; font-size: 30px; font-weight: 800; line-height: 36px; margin: 0 0 24px; text-align: center;">
+
+     </div>
+     
+     
+       
+   <!-- vertex Shader -->
+   <script id="vertex-shader" type="x-shader/x-vertex">
+
+       #version 300 es
+       precision mediump float;
+
+       in vec2 aCoordinates;
+
+       void main(void) {
+         gl_Position = vec4(aCoordinates, 0, 1);           
+         gl_PointSize = 10.0;
+       }
+       
+  </script>
+
+     
+  <!-- fragment Shader -->
+  <script id="fragment-shader" type="x-shader/x-fragment">
+      #version 300 es
+      precision mediump float;
+      
+      uniform vec4 uColor;
+
+      out vec4 fragColor;
+
+      void main(void) {
+        fragColor = uColor;
+    }
+  </script>
+     
+
+   <script>
+     
+     var canvas;
+     var colorLoc;
+     var vertexBuffer;
+     
+     var GolesIzquierda=0;
+     var GolesDerecha=0;
+     
+     var ball={
+       'x': -0.1, 'y':-0.1,
+       'width':0.1, 'height':0.1,
+       'color': [1,1,0,1],
+       'speedX':0.01, 'speedY':-0.02
+    
+     }
+     
+     var ball2={
+       'x': -0.1, 'y':-0.1,
+       'width':0.1, 'height':0.1,
+       'color': [1,0,0,1],
+       'speedX':0.005, 'speedY':-0.01,
+       'flag':false
+    
+     }
+     
+     var tintadecalamar={
+       'x': -1, 'y':-0.50,
+       'width':1, 'height':1,
+       'color': [0,0,0,1],
+       'speedX':0.0005, 'speedY':-0.0001,
+       'flag':false
+    
+     }
+     
+     var player1={
+       'x': -0.8, 'y':-0.2,
+       'width':0.1, 'height':0.4,
+       'color': [1,1,1,1],
+       'move':0 //si vale -1 bajando; 0 quieto; 1 subiendo
+     }
+     
+     var player2 ={
+       'x': 0.7, 'y':-0.2,
+       'width':0.1, 'height':0.4,
+       'color': [1,1,1,1],
+       'move':0 //si vale -1 bajando; 0 quieto; 1 subiendo
+     }
+     
+     
+     function drawRectangle (r) { //r de rectangulo
+       x = r.x;
+       y=r.y;
+       w=r.width;
+       h=r.height;
+       
+       v = new Float32Array([x,y+h,x+w,y+h,x,y,
+                           x,y,x+w,y+h,x+w,y]);
+       // Pass the vertex data to the buffer
+       gl.bufferData(gl.ARRAY_BUFFER, v, 
+                     gl.STATIC_DRAW);
+       gl.uniform4fv(colorLoc,r.color);
+       
+       gl.drawArrays(gl.TRIANGLES, 0, 6);
+     }
+     
+     
+     function init() {
+       
+       // ============ STEP 1: Creating a canvas=================
+       canvas = document.getElementById('my_Canvas');
+       gl = canvas.getContext('webgl2'); 
+
+       //======= STEP 2: Defining and storing the geometry=======
+
+       var vertices = [
+         -0.8,0.5,
+         0.0,0.5,
+         -0.25,0.25,
+         0.0, 0.0
+       ];
+
+       // Create an empty buffer object to store the vertex buffer
+       vertex_buffer = gl.createBuffer();
+
+       // Bind appropriate array buffer to it
+       gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer); 
+
+       // Unbind the buffer
+       gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+       //========== STEP 3: Create and compile shaders ==========
+
+       // Create a vertex shader object
+       var vertShader = gl.createShader(gl.VERTEX_SHADER);
+
+       // Attach vertex shader source code
+       var script = document.getElementById('vertex-shader');
+       var shaderString = script.text.trim();
+       gl.shaderSource(vertShader, shaderString);
+
+       // Compile the vertex shader
+       gl.compileShader(vertShader);
+
+       // Create fragment shader object
+       var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+
+       // Attach fragment shader source code
+       script = document.getElementById('fragment-shader');
+       shaderString = script.text.trim();
+       gl.shaderSource(fragShader, shaderString);
+
+       // Compile the fragmentt shader
+       gl.compileShader(fragShader);
+
+       // Create a shader program object to store
+       // the combined shader program
+       var shaderProgram = gl.createProgram();
+
+       // Attach a vertex shader
+       gl.attachShader(shaderProgram, vertShader); 
+
+       // Attach a fragment shader
+       gl.attachShader(shaderProgram, fragShader);
+
+       // Link both programs
+       gl.linkProgram(shaderProgram);
+
+       // Use the combined shader program object
+       gl.useProgram(shaderProgram);
+
+       //======== STEP 4: Associating shaders to buffer objects ========
+
+       // Bind vertex buffer object
+       gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+
+       // Get the attribute location
+       var coordLocation = gl.getAttribLocation(shaderProgram, "aCoordinates");
+     
+       // obtener la location del color
+       colorLoc = gl.getUniformLocation(shaderProgram, "uColor");
+
+       // Point an attribute to the currently bound VBO
+       gl.vertexAttribPointer(coordLocation, 2, gl.FLOAT, false, 0, 0);
+
+       // Enable the attribute
+       gl.enableVertexAttribArray(coordLocation);
+
+       // Unbind the buffer
+       gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+      time=0;
+      render(time);
+       
+       document.onkeydown = onKeyDown;
+       document.onkeyup = onKeyUp;
+       
+    
+     }
+     
+     function onKeyDown(key) {
+       switch (key.keyCode) {  
+         case 37: ball2.flag=false; break //flecha para izquierda, pelota troll desaparece
+         case 38: player2.move =0.02; break //flecha para arriba
+         case 39: ball2.flag=true; break //flecha para derecha, pelota troll aparece
+         case 40: player2.move =-0.02 ; break //flecha para abajo
+         case 67: tintadecalamar.flag=true;break //activamos el calamar
+         case 88: tintadecalamar.flag=false;break //activamos el calamar
+         
+         case 83: player1.move = -0.02; break // tecla S
+         case 87: player1.move = 0.02; break //flecha A
+         
+         //Velocidades-modos de juego
+         case 49: //si pulsamos 1
+           ball.speedX = 0.005; 
+           ball.speedY = -0.01; 
+           break;
+         case 50: //si pulsamos 2
+           ball.speedX = 0.01; 
+           ball.speedY = -0.02; 
+           break;
+         case 51:  //si pulsamos 3
+           ball.speedX = 0.02; 
+           ball.speedY = 0.025; 
+           break;
+       }
+     }
+     
+
+     
+     function onKeyUp(key) {
+       player1.move=0;
+       player2.move=0;
+       
+     }
+     
+     
+     function render(time) {
+       console.log('tiempo='+time); //para mostrar el tiempo.
+       //quiza while time < time variable + 3 seg
+       
+          //========= STEP 5: Drawing the primitive ===============
+
+       // Clear the canvas
+       gl.clearColor(0.1, 0.4, 0.5, 1.0);
+
+       // Clear the color buffer bit
+       gl.clear(gl.COLOR_BUFFER_BIT);
+
+       // Set the view port
+       gl.viewport(0,0,canvas.width,canvas.height);
+       
+       gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+       drawRectangle(ball);
+       
+       if (ball2.flag){
+         ball2.height=0.1
+         ball2.width=0.1
+         document.getElementById("marcador").innerHTML = "CUIDADO CON LA DISTRACCIÓN";
+         drawRectangle(ball2);
+       }else{
+         ball2.height=0
+         ball2.width=0
+       }
+       
+      if (tintadecalamar.flag){
+         tintadecalamar.height=1.4
+         tintadecalamar.width=1
+         document.getElementById("marcador").innerHTML = "TINTA CALAMAR. PULSA X";
+         drawRectangle(tintadecalamar);
+       }else{
+         tintadecalamar.height=0
+         tintadecalamar.width=0
+       }
+       
+       //animar la pleota
+       ball.x += ball.speedX;
+       ball.y += ball.speedY;
+       
+       ball2.x += ball2.speedX;
+       ball2.y += ball2.speedY;
+       
+       tintadecalamar.x += tintadecalamar.speedX;
+       tintadecalamar.y += tintadecalamar.speedY;
+       
+       //calculo los rebotes con paredes
+       if (ball.y<=-1) ball.speedY*=-1;
+       if (ball.x+ball.width>=1) ball.speedX*=-1;
+       if (ball.y+ball.height>=1) ball.speedY*=-1;
+       if (ball.x<=-1) ball.speedX*=-1;
+       
+       if (ball2.y<=-1) ball2.speedY*=-1;
+       if (ball2.x+ball2.width>=1) ball2.speedX*=-1;
+       if (ball2.y+ball2.height>=1) ball2.speedY*=-1;
+       if (ball2.x<=-1) ball2.speedX*=-1;
+         
+       
+       //animar y calculo rebotes player1;
+       if ((player1.y+player1.height+player1.move>=1) || (player1.y+player1.move<=-1)){
+         player1.y = player1.y;
+       }else{
+         player1.y += player1.move;
+       }
+       
+       //para que rebote la pelota 1 en la barra              
+       if ((ball.x >= player1.x) && (ball.x <= player1.x+player1.width)){
+         if ((ball.y+ball.height >= player1.y) && (ball.y<= player1.y+player1.height)){
+           ball.speedX *= -1;
+         }
+       }
+       
+       //para que rebote la pelota 1 en la superficie superior e inferior de la barra
+       if ((ball.x+ball.width >= player1.x) && (ball.x <= player1.x+player1.width)){
+         if ((ball.y+ball.height >= player1.y) && (ball.y<= player1.y+player1.height)){
+           ball.speedY *= -1;
+         }
+       }
+       
+       //para que rebote la pelota 2 en la barra              
+       if ((ball2.x >= player1.x) && (ball2.x <= player1.x+player1.width)){
+         if ((ball2.y+ball.height >= player1.y) && (ball2.y<= player1.y+player1.height)){
+           ball2.speedX *= -1;
+         }
+       }
+       
+       //para que rebote la pelota 2 en la superficie superior e inferior de la barra
+       if ((ball2.x+ball2.width >= player1.x) && (ball2.x <= player1.x+player1.width)){
+         if ((ball2.y+ball2.height >= player1.y) && (ball2.y<= player1.y+player1.height)){
+           ball2.speedY *= -1;
+         }
+       }
+               
+       
+       
+       //animar y calculo rebotes player2;
+       if ((player2.y+player2.height+player2.move>=1) || (player2.y+player2.move<=-1)){
+         player2.y = player2.y;
+       }else{
+         player2.y += player2.move;
+       }
+        
+       //para que la pelota 1 rebote en la barra   
+       if ((ball.x+ball.width >= player2.x) && (ball.x <= player2.x+player2.width)){
+         if ((ball.y+ball.height >= player2.y) && (ball.y<= player2.y+player2.height)){
+           ball.speedX *= -1;
+         }
+       }
+       
+       //para que la pelota 1 rebote en la superficie superior e inferior de la barra
+       if ((ball.x+ball.width >= player2.x) && (ball.x <= player2.x+player2.width)){
+         if ((ball.y+ball.height >= player2.y) && (ball.y<= player2.y+player2.height)){
+           ball.speedY *= -1;
+         }
+       }
+       
+       //para que la pelota 2 rebote en la barra   
+       if ((ball2.x+ball2.width >= player2.x) && (ball2.x <= player2.x+player2.width)){
+         if ((ball2.y+ball2.height >= player2.y) && (ball2.y<= player2.y+player2.height)){
+           ball2.speedX *= -1;
+         }
+       }
+       
+       //para que la pelota 2 rebote en la superficie superior e inferior de la barra
+       if ((ball2.x+ball.width >= player2.x) && (ball2.x <= player2.x+player2.width)){
+         if ((ball2.y+ball2.height >= player2.y) && (ball2.y<= player2.y+player2.height)){
+           ball2.speedY *= -1;
+         }
+       }
+       
+       
+      
+       //contador para pelota 1
+       if (ball.x<=-1){
+         GolesIzquierda +=1, ball.x=0, ball.y=0; //sumamos gol y reiniciamos pelota
+         document.getElementById("marcador").innerHTML = GolesDerecha +" - "+GolesIzquierda;
+         document.getElementById("marcador2").innerHTML = "";
+       }
+       
+       if (ball.x>=0.9){
+         GolesDerecha +=1, ball.x=0, ball.y=0; //sumamos gol y reiniciamos pelota
+         document.getElementById("marcador").innerHTML = GolesDerecha +" - "+GolesIzquierda;
+         document.getElementById("marcador2").innerHTML = "";
+       }
+       
+       drawRectangle(player1)
+       drawRectangle(player2)
+       
+       gl.bindBuffer(gl.ARRAY_BUFFER, null);
+       
+       window.requestAnimationFrame(render);
+     }
+     
+     window.onload =init;
+          
+
+   </script>
+   
+   </body>
+</html>
